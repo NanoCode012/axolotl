@@ -11,9 +11,8 @@ import bitsandbytes as bnb
 import torch
 import transformers
 from optimum.bettertransformer import BetterTransformer
-from transformers import (  # noqa: F401
+from transformers import (  # noqa: F401; AutoModelForCausalLM,
     AutoConfig,
-    AutoModelForCausalLM,
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
     BitsAndBytesConfig,
@@ -283,7 +282,7 @@ def load_model(
             "Exception raised attempting to load model, retrying with AutoModelForCausalLM"
         )
         logging.exception(err)
-        model = AutoModelForCausalLM.from_pretrained(
+        model = AutoModelForSeq2SeqLM.from_pretrained(
             base_model,
             load_in_8bit=cfg.load_in_8bit and cfg.adapter is not None,
             load_in_4bit=cfg.load_in_4bit and cfg.adapter is not None,
