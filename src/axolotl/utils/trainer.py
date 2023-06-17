@@ -124,7 +124,7 @@ def setup_trainer(cfg, train_dataset, eval_dataset, model, tokenizer):
     if cfg.max_grad_norm:
         training_arguments_kwargs["max_grad_norm"] = cfg.max_grad_norm
 
-    training_args = transformers.TrainingArguments(
+    training_args = transformers.Seq2SeqTrainingArguments(
         per_device_train_batch_size=cfg.micro_batch_size,
         per_device_eval_batch_size=cfg.eval_batch_size
         if cfg.eval_batch_size is not None
@@ -274,7 +274,7 @@ def setup_trainer(cfg, train_dataset, eval_dataset, model, tokenizer):
     trainer_cls = (
         OneCycleLRSchedulerTrainer
         if cfg.lr_scheduler == "one_cycle" and (cfg.fsdp or cfg.adapter == "qlora")
-        else transformers.Trainer
+        else transformers.Seq2SeqTrainer
     )
     trainer = trainer_cls(
         model=model,
