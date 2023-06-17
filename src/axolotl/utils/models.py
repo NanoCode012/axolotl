@@ -14,6 +14,7 @@ from optimum.bettertransformer import BetterTransformer
 from transformers import (  # noqa: F401
     AutoConfig,
     AutoModelForCausalLM,
+    AutoModelForSeq2SeqLM,
     AutoTokenizer,
     BitsAndBytesConfig,
     LlamaConfig,
@@ -267,7 +268,7 @@ def load_model(
             ):
                 config.max_sequence_length = cfg.sequence_len
                 logging.warning(f"increasing context length to {cfg.sequence_len}")
-            model = AutoModelForCausalLM.from_pretrained(
+            model = AutoModelForSeq2SeqLM.from_pretrained(
                 base_model,
                 config=config,
                 load_in_8bit=cfg.load_in_8bit and cfg.adapter is not None,
@@ -439,7 +440,7 @@ def load_lora(model, cfg):
         fan_in_fan_out=cfg.lora_fan_in_fan_out,
         modules_to_save=cfg.lora_modules_to_save if cfg.lora_modules_to_save else None,
         bias="none",
-        task_type="CAUSAL_LM",
+        task_type="SEQ_2_SEQ_LM",
     )
 
     if cfg.lora_model_dir:
