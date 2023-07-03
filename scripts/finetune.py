@@ -15,7 +15,7 @@ import yaml
 
 # add src to the pythonpath so we don't need to pip install this
 from optimum.bettertransformer import BetterTransformer
-from transformers import GenerationConfig, TextStreamer
+from transformers import GenerationConfig
 
 from axolotl.utils.data import load_prepare_datasets, load_pretraining_dataset
 from axolotl.utils.dict import DictDefault
@@ -65,6 +65,47 @@ def get_multi_line_input() -> Optional[str]:
 
 
 def do_inference(cfg, model, tokenizer, prompter: Optional[str]):
+    def infer(data: str | Dict | None) -> Optional[str]:
+        if not instructions:
+            return None
+        if prompter_module and isinstance(data, dict):
+            prompt: str = next(prompter_module().build_prompt(**data))
+        elif prompter_module and isinstance(data, str):
+            prompt = next(prompter_module().build_prompt(instruction=data))
+        elif isinstance(data, str):
+            prompt = data.strip()
+        else:
+            raise ValueError("Invalid data type for inference")
+        batch = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
+
+        model.eval()
+        with torch.no_grad():
+            generation_config = GenerationConfig(
+                repetition_penalty=1.1,
+                max_new_tokens=1024,
+                temperature=0.9,
+                top_p=0.95,
+                top_k=40,
+                bos_token_id=tokenizer.bos_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.pad_token_id,
+                do_sample=True,
+                use_cache=True,
+                return_dict_in_generate=True,
+                output_attentions=False,
+                output_hidden_states=False,
+                output_scores=False,
+            )
+            # streamer = TextStreamer(tokenizer)
+            generated = model.generate(
+                inputs=batch["input_ids"].to(cfg.device),
+                generation_config=generation_config,
+                # streamer=streamer,
+            )
+        return tokenizer.decode(
+            generated["sequences"].cpu().tolist()[0], skip_special_tokens=True
+        )
+
     default_tokens = {"unk_token": "<unk>", "bos_token": "<s>", "eos_token": "</s>"}
 
     for token, symbol in default_tokens.items():
@@ -86,47 +127,35 @@ def do_inference(cfg, model, tokenizer, prompter: Optional[str]):
             max_seq_len=255, mem_freq=50, top_k=5, max_cache_size=None
         )
 
-    while True:
-        print("=" * 80)
-        # support for multiline inputs
-        instruction = get_multi_line_input()
-        if not instruction:
-            return
-        if prompter_module:
-            prompt: str = next(
-                prompter_module().build_prompt(instruction=instruction.strip("\n"))
-            )
-        else:
-            prompt = instruction.strip()
-        batch = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
+    if cfg.inference_file:
+        with open(cfg.inference_file, encoding="utf-8") as reader:
+            with open(cfg.inference_file + ".out", "w", encoding="utf-8") as out:
+                for i, instructions in enumerate(reader.readlines()):
+                    # Check if the instruction is a dict
+                    if instructions.startswith("{"):
+                        instructions = yaml.safe_load(instructions)
+                    res = infer(instructions)
+                    out.write(f"========{i}========")
+                    out.write("\n")
+                    out.write(res or "ERROR")
+                    out.write("\n")
 
-        print("=" * 40)
-        model.eval()
-        with torch.no_grad():
-            generation_config = GenerationConfig(
-                repetition_penalty=1.1,
-                max_new_tokens=1024,
-                temperature=0.9,
-                top_p=0.95,
-                top_k=40,
-                bos_token_id=tokenizer.bos_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-                pad_token_id=tokenizer.pad_token_id,
-                do_sample=True,
-                use_cache=True,
-                return_dict_in_generate=True,
-                output_attentions=False,
-                output_hidden_states=False,
-                output_scores=False,
-            )
-            streamer = TextStreamer(tokenizer)
-            generated = model.generate(
-                inputs=batch["input_ids"].to(cfg.device),
-                generation_config=generation_config,
-                streamer=streamer,
-            )
-        print("=" * 40)
-        print(tokenizer.decode(generated["sequences"].cpu().tolist()[0]))
+                    # if isinstance(instructions, dict):
+                    #     output = {**instructions, "result": res or "ERROR"}
+                    # elif isinstance(instructions, str):
+                    #     output = {"input": instructions, "result": res or "ERROR"}
+
+                    # json.dump(output, out)
+                    # out.write("\n")
+        return
+
+    # while True:
+    #     print("=" * 80)
+    #     # support for multiline inputs
+    #     instruction = get_multi_line_input()
+    #     out = infer(instruction or) or "ERROR"
+
+    #     print(out)
 
 
 def choose_config(path: Path):
