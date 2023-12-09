@@ -1,18 +1,19 @@
 # pylint: skip-file
 
+
 from collections import namedtuple
 from functools import partial
 
 from mamba_ssm.models.mixer_seq_simple import MixerModel, _init_weights
-from mamba_ssm.utils.generation import GenerationMixin
 from mamba_ssm.utils.hf import load_config_hf, load_state_dict_hf
 from torch import nn
 from torch.nn import CrossEntropyLoss
+from transformers import PreTrainedModel
 
 from axolotl.models.mamba.configuration_mamba import MambaConfig
 
 
-class MambaLMHeadModel(nn.Module, GenerationMixin):
+class MambaLMHeadModel(PreTrainedModel):
     def __init__(
         self,
         d_model: int,
