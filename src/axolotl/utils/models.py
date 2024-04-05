@@ -906,4 +906,21 @@ def load_lora(model, cfg, inference=False, config_only=False):
     elif cfg.fsdp and cfg.adapter == "qlora":
         setup_quantized_peft_meta_for_training(model)
 
+    # Cast trainable to fp32 when using fp16
+    if cfg.torch_dtype == torch.float16:
+        for name, module in model.named_modules():
+            for param in module.parameters():
+                # do not overwrite the dtype of certain model's parameters
+                # TODO: The lm_head an embed_tokens might need to be fp32 also
+                if "norm" in name or any(
+                    m in name
+                    for m in get_linear_embedding_layers(cfg.model_config_type)
+                ):
+                    continue
+
+                if not param.requires_grad:
+                    param.data = param.to(torch.float16)
+                else:
+                    param.data = param.to(torch.float32)
+
     return model, lora_config
